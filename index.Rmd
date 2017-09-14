@@ -1,0 +1,17 @@
+---
+title: "HW0"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 課程目標
+
+希望在這門課中實際完成一份專案，也能做為自己未來找尋工作上履歷的加分。
+
+```{r cars}
+
+```
+

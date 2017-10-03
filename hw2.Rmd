@@ -1,0 +1,129 @@
+---
+title: "hw2"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 讀取資料
+
+
+```{r data}
+data1 <- read.csv("titanic.csv", header=T)
+head(data1)
+```
+
+## 整理資料
+將乘客及員工分開之資料分開，並將資料中為9999的值視為遺失值而剃除
+
+```{r sort}
+cus <- data1[data1$class %in% c(1,2,3),]
+boa <- data1[!data1$class %in% c(1,2,3),]
+
+cus <- cus[!cus$fare == 9999,]
+cus <- cus[!cus$age == 9999,]
+boa <- boa[!boa$age == 9999,]
+```
+
+## 船員及乘客的基本敘述統計
+
+由於原始資料沒有說明性別中0和1代表的性別，由船員的性別分布結果來看，我推論0為男性，1為女性
+
+```{r describe}
+#乘客年齡分布
+summary(cus$age)
+#船員年齡分布
+summary(boa$age)
+#乘客性別分布
+table(cus$gender)
+#船員性別分布
+table(boa$gender)
+```
+
+## 問題ㄧ  是否獨自乘船的死亡率
+
+此處僅使用乘客資料，要探討的問題為「是否以單獨身分在船上」的乘客死亡率。
+
+使用的方式為將姓名字串以逗號分隔後，將同樣姓氏的人設為ㄧ家人，並創造一個新變數後，1表示單獨在船上，0則表示船上有家人。
+
+此方法或許嚴謹性不足因只要同姓氏就會被算成ㄧ家人，若有更齊全的船員背景資料則能做更嚴謹的分析，但這裡做出的結果事有差異的：有家庭在船上的死亡率低於單獨在船上的，估計是因為家庭會幫助自己家中的老弱婦孺先行上船，單身的人則也較是在災難時幫助別人上船的。
+
+```{r single}
+nam <- strsplit(as.character(cus$name),",",fixed = T)
+a1 <- unlist(nam)
+a2 <- a1[seq(1,length(a1)-2,2)]
+fam <- names(table(a2)[table(a2)>1])
+cus$lastname <- a2
+cus$singal <- rep(1,1285)
+cus$singal[cus$lastname %in% fam] = 0
+af <- table(cus$survival,cus$singal)
+#家庭搭船死亡率
+af[1,1] / (af[1,1]+af[2,1]) 
+#單獨搭船死亡率
+af[1,2] / (af[1,2]+af[2,2]) 
+```
+
+## 問題二  高消費者的上救生艇率
+
+由summary函數得到票價的第三四分位距為31元，故把大於31元的票價定義為高消費族群後，再與是否上救生艇做出列聯表，從結果可以發現票價高能上救生艇的比率顯著的較ㄧ般的乘客來的高，直接拿是否為高價位票價乘客的死亡率做比較後，更能得出票價高有較高存活率的結論。
+
+```{r rich}
+library(dplyr)
+rich <- select(cus,fare,boat,survival) %>%
+  filter(fare > summary(cus$fare)[5])
+table(rich$boat)
+#票價貴的上救生艇率
+a1 <- sum(table(rich$boat)[-1]) / sum(table(rich$boat))
+#不分票價乘客的上救生艇率
+a2 <- sum(table(cus$boat)[-1]) / sum(table(cus$boat))
+aa <- as.data.frame(cbind(a1,a2))
+names(aa) <- c('票價貴的上救生艇率','不分票價乘客的上救生艇率')
+print(aa)
+#票價貴的死亡率
+a3 <- table(rich$survival)[1] / sum(table(rich$survival))
+#不分票價的死亡率
+a4 <- table(cus$survival)[1] / sum(table(cus$survival))
+aa2 <- as.data.frame(cbind(a3,a4))
+names(aa2) <- c('票價貴的死亡率','不分票價的死亡率')
+print(aa2)
+```
+
+## 問題三  老弱婦孺的死亡率
+
+從資料的年齡分布來看，我取小於20歲及大於50歲做為小孩及老人的年齡，在比較死亡率後，可以看出老人及小孩的死亡率是顯著低於所有人的比例的。
+
+接著因為是想查看老弱婦孺，因此把性別也納入考量，真正的「老弱婦孺」跟所有人的死亡率做比較的話差異極大，但把女性的死亡率單獨抓出來才發現，女性的死亡率本來就偏低，因此把整個老弱婦孺的死亡率都拉低了。
+
+
+```{r old}
+cus <- data1[data1$class %in% c(1,2,3),]
+boa <- data1[!data1$class %in% c(1,2,3),]
+cus <- cus[!cus$fare == 9999,]
+cus <- cus[!cus$age == 9999,]
+boa <- boa[!boa$age == 9999,]
+allb <- rbind(cus,boa)
+barplot(table(cut(allb$age,seq(1,71,10))))
+weak <- select(allb,gender,age,survival) %>%
+  filter(age > 50|age < 20)
+table(weak$survival)
+#老少的死亡率
+b1 <- table(weak$survival)[1] / sum(table(weak$survival))
+#所有人的死亡率
+b2 <- table(allb$survival)[1] / sum(table(allb$survival))
+bb <- as.data.frame(cbind(b1,b2))
+names(bb) <- c('老少的死亡率','所有人的死亡率')
+print(bb)
+#老弱婦孺的死亡率
+weakg <- select(allb,gender,age,survival) %>%
+  filter(age > 50|age < 20 , gender==1)
+b3 <- table(weakg$survival)[1] / sum(table(weakg$survival))
+#所有女性死亡率
+fem <- select(allb,gender,age,survival) %>%
+  filter(gender==1)
+b4 <- table(fem$survival)[1] / sum(table(fem$survival))
+bb2 <- as.data.frame(cbind(b3,b4))
+names(bb2) <- c('老弱婦孺的死亡率','所有女性的死亡率')
+print(bb2)
+```

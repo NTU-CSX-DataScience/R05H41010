@@ -1,0 +1,85 @@
+---
+title: "hw3"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 使用package
+
+
+```{r library, echo=TRUE, message=FALSE, warning=FALSE}
+library(Rfacebook)
+library(NLP)
+library(tm)
+library(jiebaRD)
+library(jiebaR)
+library(RColorBrewer)
+library(wordcloud)
+library(wordcloud2)
+```
+
+## 擷取粉專資料
+
+我固定會followㄧ些籃球粉專，其中這個叫做天sky的專欄作者的文字我特別喜歡，他常常談論ㄧ些比較冷門球隊或是年輕有未來性的球員，因此讓我對NBA有更深一層的認識，因此利用這次作業爬下他近期的200篇po文，探討他常提及的字詞及球隊。
+
+籃球專欄─天sky ：https://www.facebook.com/skyswritingland/
+
+```{r data, echo=TRUE, message=FALSE, warning=FALSE}
+token  = "EAACEdEose0cBACXUvdcO5ZBgcVZA44I9RIZBs8TDIt1uWfxo6ZAilwfb4FTpm3JWs6TORZAMIQlcE6gCMrkUsZCGJoOUoKZBTlsxDeg6glJKSXgzye9tZBcVZArAPOZCTfEZCvcf1QfVdFInAS3kxqDOo5bxT8TgVAiZA1vC0igRXlvHw4q5DswW9YyqX9aE9uaE6KUZD"
+page.id <- "338614156342478" 
+page <- getPage(page.id, token, n = 200)
+```
+
+## 清理文本及建立詞頻矩陣
+
+這裡我在詞頻字典中新增了「擋拆」、「我鹿」(我鹿是作者對於公鹿隊的暱稱)兩個詞，因在我印象中這兩個詞在天sky常在文章中所提及，但避免字典不認得而做了切割。
+
+```{r docs}
+docs <- Corpus(VectorSource(as.character(page[,3])))
+toSpace <- content_transformer(function(x,pattern){
+  return (gsub(pattern," ",x))
+})
+docs <- tm_map(docs, toSpace, "※")
+docs <- tm_map(docs, toSpace, "◆")
+docs <- tm_map(docs, toSpace, "‧")
+docs <- tm_map(docs, toSpace, "的")
+docs <- tm_map(docs, toSpace, "我")
+docs <- tm_map(docs, toSpace, "也")
+docs <- tm_map(docs, toSpace, "他")
+docs <- tm_map(docs, toSpace, "是")
+docs <- tm_map(docs, toSpace, "就")
+docs <- tm_map(docs, toSpace, "了")
+docs <- tm_map(docs, toSpace, "在")
+docs <- tm_map(docs, toSpace, "但")
+docs <- tm_map(docs, toSpace, "都")
+docs <- tm_map(docs, toSpace, "不")
+docs <- tm_map(docs, toSpace, "看板")
+docs <- tm_map(docs, toSpace, "作者")
+docs <- tm_map(docs, toSpace, "發信站")
+docs <- tm_map(docs, toSpace, "批踢踢實業坊")
+docs <- tm_map(docs, toSpace, "[a-zA-Z]")
+docs <- tm_map(docs, removePunctuation)
+docs <- tm_map(docs, removeNumbers)
+docs <- tm_map(docs, stripWhitespace)
+mixseg = worker()
+new_user_word(mixseg,'我鹿','n')
+new_user_word(mixseg,'擋拆','n')
+
+jieba_tokenizer=function(d){
+  unlist(segment(d[[1]],mixseg))
+}
+seg = lapply(docs, jieba_tokenizer)
+freqFrame = as.data.frame(table(unlist(seg)))
+```
+
+## 建立文字雲
+
+從文字雲的結果可以看出，天sky在文章中很常分析球員的打球方式，如「低位」、「內線」、「出手」、「三分」等等，另外「防守」也是他談論的一項重點。此外「天賦」和「未來」這種詞彙也大量出現在文章當中，符合我原先預期說他總是談論ㄧ些年輕的潛力球員。球隊的部分則是「七六人隊」大大的出現在文字雲中，不過就我對作者的了解他應當是公鹿球迷，看來我該提醒他多多撰寫公鹿隊的文章了哈哈。
+
+```{r cloud}
+wordcloud2(freqFrame, minSize =30, minRotation = -pi/6, maxRotation = pi/6,
+           rotateRatio = 1)
+```

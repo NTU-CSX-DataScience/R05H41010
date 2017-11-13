@@ -1,0 +1,160 @@
+---
+title: "hw4"
+output: html_document
+---
+##使用packages
+
+```{r library, echo=TRUE, message=FALSE, warning=FALSE}
+library(NLP)
+library(tm)
+library(tmcn)
+Sys.setenv(JAVA_HOME = "C:/Program Files/Java/jdk-9.0.1/")
+library(rJava)
+library(SnowballC)
+library(slam)
+library(Matrix)
+library(ggplot2)
+library(plotly)
+library(stats)
+```
+
+##使用資料
+
+本次作業延續作業三所使用之資料，續做文字之於文章間的關連度分析。
+作業三網址：https://ntu-csx-datascience.github.io/R05H41010/hw3.html
+
+```{r cars, message=FALSE, warning=FALSE, include=FALSE}
+library(Rfacebook)
+library(NLP)
+library(tm)
+library(jiebaRD)
+library(jiebaR)
+library(RColorBrewer)
+library(wordcloud)
+library(wordcloud2)
+
+token  = "EAACEdEose0cBAHhQZAEFnTGIIOYjgdgt2lB3FsI7yI2RtsaG8wsZC0S3ElYZA3suCNbBdhofNgfp1rkU3XYtZAIGKlaZCxHdkLUuJZAyuaB6mDdRPNKtF1UXZCHQkOnAZAyjka2OtsrVWjEBZCZAWfvpSk3Wa008ZAi3ZCVaixyZAuE8z9wZAxrk7WqKDOaZA6364CZBswAZD"
+#天sky
+page.id <- "338614156342478" 
+page <- getPage(page.id, token, n = 100)
+
+
+docs <- Corpus(VectorSource(as.character(page[,3])))
+toSpace <- content_transformer(function(x,pattern){
+  return (gsub(pattern," ",x))
+})
+docs <- tm_map(docs, toSpace, "※")
+docs <- tm_map(docs, toSpace, "◆")
+docs <- tm_map(docs, toSpace, "‧")
+docs <- tm_map(docs, toSpace, "的")
+docs <- tm_map(docs, toSpace, "我")
+docs <- tm_map(docs, toSpace, "也")
+docs <- tm_map(docs, toSpace, "他")
+docs <- tm_map(docs, toSpace, "是")
+docs <- tm_map(docs, toSpace, "就")
+docs <- tm_map(docs, toSpace, "了")
+docs <- tm_map(docs, toSpace, "在")
+docs <- tm_map(docs, toSpace, "但")
+docs <- tm_map(docs, toSpace, "都")
+docs <- tm_map(docs, toSpace, "不")
+docs <- tm_map(docs, toSpace, "看板")
+docs <- tm_map(docs, toSpace, "作者")
+docs <- tm_map(docs, toSpace, "發信站")
+docs <- tm_map(docs, toSpace, "批踢踢實業坊")
+#docs <- tm_map(docs, toSpace, "[a-zA-Z]")
+docs <- tm_map(docs, removePunctuation)
+docs <- tm_map(docs, removeNumbers)
+docs <- tm_map(docs, stripWhitespace)
+mixseg = worker()
+new_user_word(mixseg,'我鹿','n')
+new_user_word(mixseg,'擋拆','n')
+new_user_word(mixseg,'七六人','n')
+
+jieba_tokenizer=function(d){
+  unlist(segment(d[[1]],mixseg))
+}
+seg = lapply(docs, jieba_tokenizer)
+
+```
+
+
+
+
+## Term Document Matrix
+
+首先建立一個字詞在各文章出現次數的Term Document Matrix，再來我對於與「七六人」這支球隊相關性高的幾個詞有興趣，因此以直方圖查看有哪些詞彙以及相關的程度。
+
+從直方圖可以看出，在提到七六人這支球隊時，作者也常常提及他賦予期待的球員Ben Simmons以及球隊的口號TrustTheProcess，甚至作者認為這支球隊的組成已經預約偉大，因此偉大這個詞也常常伴隨在提及七六人隊的文章當中。
+
+```{r pressure, echo=TRUE, message=FALSE, warning=FALSE}
+d.corpus <- Corpus(VectorSource(seg))
+tdm <- TermDocumentMatrix(d.corpus, 
+       control = list(wordLengths = c(2, Inf)))
+#Term Document Matrix
+tdm1 <- as.matrix(tdm)
+tdm1[21:31,1:10]
+ass = findAssocs(tdm, "七六人", 0.75)
+gogo <- unlist(ass)
+go1 <- cbind(names(gogo),gogo)
+go1 <- as.data.frame(go1)
+ggplot(go1,aes(x=V1,y=gogo))+geom_bar(stat='identity')+labs(x='關聯詞',y='關聯度')
+```
+
+
+
+
+## TF-IDF
+
+接著建立TF-IDF矩陣，也就是查看每個字詞與每篇文章的相關程度。
+
+由TF-IDF矩陣得以繪製下圖，即呈現一些與七六人隊高度相關的字詞分別於第幾篇文章出現，其中橫軸越往右代表著距今越久以前的文章。由圖可以看出，近期的文章較以前頻繁的提到七六人隊的相關內容，因此推論最新這一賽季的七六人隊得到作者的高度關注，並且由Ben Simmons這位球員出現的頻率與「偉大」出現的重合度推論，這位球員是作者這季非常關注的新星（與我長期關注此粉專的感受相同）。
+
+
+```{r tfidf, echo=TRUE, message=FALSE, warning=FALSE}
+N = tdm$ncol
+tf <- apply(tdm, 2, sum)
+idfCal <- function(word_doc)
+{ 
+  log2( N / nnzero(word_doc) ) 
+}
+idf <- apply(tdm, 1, idfCal)
+
+doc.tfidf <- as.matrix(tdm)
+for(x in 1:nrow(tdm))
+{
+  for(y in 1:ncol(tdm))
+  {
+    doc.tfidf[x,y] <- (doc.tfidf[x,y] / tf[y]) * idf[x]
+  }
+}
+topID = lapply(rownames(as.data.frame(ass)), function(x) 
+  which(rownames(tdm) == x))
+topID = unlist(topID)
+
+
+plot_ly(data = as.data.frame(doc.tfidf),
+        x = as.numeric(colnames(doc.tfidf)),
+        y = doc.tfidf[topID[2],], 
+        name = rownames(doc.tfidf)[topID[2]],
+        type = "scatter", mode= "box") %>%
+add_trace(y = doc.tfidf[topID[5],],
+          name = rownames(doc.tfidf)[topID[5]]) %>%
+add_trace(y = doc.tfidf[topID[7],],
+          name = rownames(doc.tfidf)[topID[7]])
+```
+
+
+
+## K-means 分群
+
+最後將這100篇文章進行分群，分群的軸分別為「全能」及「生澀」這兩個對比的詞彙，預期想分出「只提到全能」、「只提到生澀」、「全能與生澀出現在同一篇文章」這三群，依此推論作者較常是客觀比較球員還是總是在批評，亦或總是在褒獎球員，因此我預期圖形為左邊一群、下面一群、右上方一群。
+
+由分群結果看出，K-means法似乎只依提到「全能」的多寡做了分群，與我預期的結果略有不同，或許是因處於右上方的文章數太少，K-means就將其分至最右邊群了，至於從兩軸的文張數來看，提到「全能」的文章數明顯多於提到「生澀」，因此估計作者文章多是提到看好的球員並且予以褒獎。
+
+```{r kmeans, echo=TRUE, message=FALSE, warning=FALSE}
+tt <- t(doc.tfidf)
+tt1 <- as.data.frame(tt)
+ya <- tt1[,names(tt1) %in% c("全能","生澀")]
+kmeansOut <- kmeans(ya, 3, nstart = 40)
+plot(ya,col=(kmeansOut$cluster+1),pch=20,cex=2)
+```

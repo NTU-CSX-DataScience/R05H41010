@@ -1,0 +1,67 @@
+---
+title: "給安安"
+output: html_document
+---
+
+## 使用packages
+
+```{r package, echo=TRUE, message=FALSE, warning=FALSE}
+library(e1071)
+library(ggplot2)
+```
+
+
+## 使用資料
+```{r data}
+nba <- read.csv("hw5data.csv")
+#查看資料長相
+head(nba)
+#觀察資料維度
+dim(nba)
+#各隊進行的比賽數
+table(nba$Team)
+```
+
+
+## SVM
+
+就是阿安安我發現一件事，現在先把SVM想成可以分類的迴歸好了，如果X(自變數)擺Offensive rating跟Defensive rating，基本上就能很精準的分類了，這裡呈現的就是只擺這兩個X的分類結果。
+
+```{r svm}
+traindata1 <- nba[1:170,c(4,6,7)]
+testdata1 <- nba[171:212, c(6,7)]
+svmfit = svm(as.factor(W.L) ~ ., data = traindata1, 
+             kernel = "polynomial", 
+             cost = 10, scale = FALSE)
+plot(svmfit, traindata1)
+predict1 = predict(svmfit, testdata1)
+ans1 = table(predict1, nba[171:212, 4])
+print(ans1)
+acc1 = (ans1[1,1]+ans1[2,2])/sum(ans1)
+print(acc1)
+```
+
+## SVM2
+
+那這裡呢則是不擺進攻&防守效率，其他變數全上，結果反而沒有上一個準哈哈，至於我早上貼給你的則是這裡的變數外加進攻防守效率全部進來，才讓模型準度到100%
+
+```{r svm2}
+traindata2 <- nba[1:170,c(4,9:21)]
+testdata2 <- nba[171:212, c(9:21)]
+svmfit2 = svm(as.factor(W.L) ~ ., data = traindata2, 
+             kernel = "polynomial", 
+             cost = 10, scale = FALSE)
+predict2 = predict(svmfit2, testdata2)
+ans2 = table(predict2, nba[171:212, 4])
+print(ans2)
+acc2 = (ans2[1,1]+ans2[2,2])/sum(ans2)
+print(acc2)
+```
+
+## 所以我是想跟你說
+
+我想說的是，最難的還是預測每場的進攻&防守效率哈哈哈哈，他們都是很多其他變數加權得來的，這裡附上Dean Oliver(又是他QQ)給的計算公式：https://www.basketball-reference.com/about/ratings.html
+
+
+所以我覺得要解決的是，預測遇到什麼樣的對手能有好的進攻/防守效率表現吧，或許可以分群或是怎麼樣看看，我只是跟你講一下我研究一個下午的歸納ㄏㄏ
+

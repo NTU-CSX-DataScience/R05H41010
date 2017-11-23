@@ -8,3 +8,5 @@
 作業三：文字雲 https://ntu-csx-datascience.github.io/R05H41010/hw3.html
 
 作業四：TF-IDF & K-means https://ntu-csx-datascience.github.io/R05H41010/hw4.html
+
+Shiny Test：https://r05h41010.shinyapps.io/test1/

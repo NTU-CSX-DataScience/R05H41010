@@ -1,0 +1,117 @@
+---
+title: "hw5"
+output: html_document
+---
+
+## 使用packages
+
+```{r package, echo=TRUE, message=FALSE, warning=FALSE}
+library(e1071)
+library(ggplot2)
+library(stats)
+library(jpeg)
+```
+
+
+## 使用資料
+
+本次作業使用basketball-reference所記錄之NBA2017-18賽季球隊進階數據，並且擷取了東區15支球隊於2017/11/17前的所有比賽，共212場比賽數據及21個變數。
+
+NBA Reference：https://www.basketball-reference.com/
+
+```{r data}
+nba <- read.csv("hw5data.csv")
+#查看資料長相
+head(nba)
+#觀察資料維度
+dim(nba)
+#各隊進行的比賽數
+table(nba$Team)
+```
+
+## 將比賽分群
+
+我將資料中所有的比賽分為3群，希望能藉由kmeans法所分出的比賽群集進一步挖掘資料中有趣的現象。
+
+我將分群結果的場次勝負分平均加以計算後，可以看出群一代表大部分贏球的比賽，群二則是代表大部分輸球的比賽，群三由勝負分來看沒那麼容易區分，或許有其他變數決定了這些比賽場次的分群。
+
+```{r cluster}
+kk <- nba[,c(2,7:21)]
+set.seed(34)
+kmeansOut <- kmeans(kk, 3, nstart = 50)
+nba$cluster <- kmeansOut$cluster
+nba$winloss <- nba$Tm - nba$Opp.1
+#各群的勝負分數平均
+tapply(nba$winloss,nba$cluster,mean)
+#各群勝負分分布圖
+ggplot(nba,aes(x=as.factor(cluster),y=winloss))+geom_boxplot()+labs(x='群集',y='勝負分')
+```
+
+## ANOVA分析
+
+這裡我抓了兩個變數進行ANOVA分析，判斷由kmeans分出的群集當中這些變數是否有差異。
+
+首先抓出Pace，也就是比賽的節奏。從p-value=0.847不拒絕H0的結果，推論比賽節奏的快慢並不是贏球或輸球的保證，可能有球隊打快節奏仍然常敗，習慣慢節奏的球隊仍有自己的取勝之道。
+
+接著我抓取TRB%，也就是籃板率。從極小的p-value推論不同群間的籃板率有顯著差異，並且勝分高的比賽普遍有著較高的籃板率，輸球的比賽籃板率亦相對較低，因此驗證了灌籃高手當中，赤木隊長的經典名言：「掌握籃板球的人，便能夠主宰比賽！」
+
+```{r anova}
+#檢驗每群的pace是否相同
+anova(m1 <- lm(cluster~Pace,data=nba))
+#檢驗每群的籃板率是否相同
+anova(m1 <- lm(cluster~TRB.,data=nba))
+ggplot(nba,aes(x=as.factor(cluster),y=TRB.))+geom_boxplot()+labs(x='群集',y='籃板率')
+```
+
+
+![](174011574.jpg)
+
+
+## 相關矩陣
+
+進一步地，我建立所有變數的相關矩陣，希望能找出各變數的關聯。
+
+```{r view}
+cor(nba[,c(2,4,7:21)])
+```
+
+## 二維SVM
+
+從上述的correlation matrix結果中，我想先挑出兩個與勝負最相關的變數進行二維SVM的建模，希望建出一個能精準分類勝負的模型，因此要取用與勝負相關性高的變數。於是我採用ORtg(進攻效率)跟DRtg(防守效率)兩個變數，並且取用了170筆資料作為train data，41筆資料當作test data，完成的結果如附圖及附表。
+
+```{r svm}
+traindata1 <- nba[1:170,c(4,6,7)]
+testdata1 <- nba[171:212, c(6,7)]
+svmfit = svm(as.factor(W.L) ~ ., data = traindata1, 
+             kernel = "polynomial", 
+             cost = 10, scale = FALSE)
+#SVM分類圖
+plot(svmfit, traindata1)
+predict1 = predict(svmfit, testdata1)
+#正確度表格
+ans1 = table(predict1, nba[171:212, 4])
+print(ans1)
+#此模型正確率
+acc1 = (ans1[1,1]+ans1[2,2])/sum(ans1)
+print(acc1)
+```
+
+## 高維度的SVM
+
+從以上結果可以得知模型精準度達0.833，已經是足夠精確的模型，接著繼續嘗試高維度的SVM，我將網站中截取到的所有進階數據代入模型中，得到了100%的精確度，由此可知這些進階數據已經能完美的詮釋比賽勝負，是能夠參考及解讀的數據。
+
+
+```{r svm2}
+traindata2 <- nba[1:170,c(4,7:21)]
+testdata2 <- nba[171:212, c(7:21)]
+svmfit2 = svm(as.factor(W.L) ~ ., data = traindata2, 
+             kernel = "polynomial", 
+             cost = 10, scale = FALSE)
+predict2 = predict(svmfit2, testdata2)
+#正確度表格
+ans2 = table(predict2, nba[171:212, 4])
+print(ans2)
+acc2 = (ans2[1,1]+ans2[2,2])/sum(ans2)
+#此模型正確率
+print(acc2)
+```

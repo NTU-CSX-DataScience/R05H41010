@@ -9,4 +9,6 @@
 
 作業四：TF-IDF & K-means https://ntu-csx-datascience.github.io/R05H41010/hw4.html
 
+作業五：nba進階數據分析 https://ntu-csx-datascience.github.io/R05H41010/hw5.html
+
 Shiny Test：https://r05h41010.shinyapps.io/test1/
